@@ -1,0 +1,469 @@
+= Processing CloudEvents with Spring and Knative
+
+[[introduction]]
+== Introduction
+
+This document describes how to get started writing SpringBoot apps that can process CloudEvents when deployed to Knative.
+
+Prerequisits:
+
+- kubectl CLI and a Kubernetes cluster
+- curl command
+- Java 11 JDK
+- https://skaffold.dev/[Skaffold]
+- https://www.docker.com/[Docker] and https://buildpacks.io/docs/install-pack/[pack CLI]
+
+== Initialize a project
+
+Initialize a Spring Boot function application from https://start.spring.io[start.spring.io]:
+
+[source,bash]
+----
+APPNAME=spring-events
+curl https://start.spring.io/starter.tgz \
+ -d dependencies=webflux,actuator,cloud-function \
+ -d language=java \
+ -d javaVersion=11 \
+ -d type=maven-project \
+ -d groupId=com.example \
+ -d artifactId=${APPNAME} \
+ -d name=${APPNAME} \
+ -d packageName=com.example.${APPNAME} \
+ -d baseDir=${APPNAME} | tar -xzvf -
+cd ${APPNAME}
+----
+
+== Add the function code
+
+Add CloudEvents API as a dependency in `pom.xml`:
+
+[source,xml]
+----
+        <dependency>
+            <groupId>io.cloudevents</groupId>
+            <artifactId>cloudevents-api</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+----
+
+Also add the jsonschema2pojo plugin to the `build` section in `pom.xml`:
+
+[source,xml]
+----
+            <plugin>
+                <groupId>org.jsonschema2pojo</groupId>
+                <artifactId>jsonschema2pojo-maven-plugin</artifactId>
+                <version>1.0.2</version>
+                <configuration>
+                    <sourceDirectory>${basedir}/src/main/resources/schema</sourceDirectory>
+                    <targetPackage>com.example.types</targetPackage>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+----
+
+Next add the scema for the `SpringEvent` class.
+
+> We expect this type being part of a type registry in Knative Eventing. In this case we haven't registered a source that will provide this type. Instead we'll add this manually to our project. 
+
+Create the file:
+
+[source,bash]
+----
+mkdir -p src/main/resources/schema
+touch src/main/resources/schema/spring-event.json
+----
+
+Then, add this content:
+
+.src/main/resources/schema/spring-event.json
+[source,json]
+----
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SpringEvent",
+    "description" : "This is the schema for the SpringEvent type.",
+    "type": "object",
+    "properties": {
+        "releaseDate": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "releaseName": {
+            "type": "string"
+        },
+        "version": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": false
+}
+----
+
+We now need to add a CloudEventMapper that can map incoming JSON data to the generated `SpringEvent` class and also add the header information to a `CloudEvent` class.", 
+
+> We expect this type of functionality to be added to Spring Cloud Function in the near future, but for now we need to provide this mapping ourselves. 
+
+Just to keep this simple, we will copy a simple mapper implementation from the https://github.com/trisberg/cloud-event-mapper[trisberg/cloud-event-mapper] repository.
+
+Copy the file:
+
+[source,bash]
+----
+mkdir -p src/main/java/com/springdeveloper/support/cloudevents
+curl https://raw.githubusercontent.com/trisberg/cloud-event-mapper/master/src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java \
+  -o src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java
+----
+
+Finally, we need to add the function code to handle the CloudEvent in the SpringEventsApplication class:
+
+.src/main/java/com/example/springevents/SpringEventsApplication.java
+[source,java,subs=+quotes]
+----
+package com.example.springevents;
+
+import java.util.function.Function;
+
+import com.example.types.SpringEvent;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.springdeveloper.support.cloudevents.CloudEventMapper;
+import io.cloudevents.CloudEvent;
+import io.cloudevents.v03.AttributesImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
+
+@SpringBootApplication
+public class SpringEventsApplication {
+
+    private Logger log = LoggerFactory.getLogger(SpringEventsApplication.class);
+
+    @Bean
+    public Function<Message<JsonNode>, Message<String>> fun() {
+        return (in) -> {
+            CloudEvent<AttributesImpl, SpringEvent> cloudEvent = CloudEventMapper.convert(in, SpringEvent.class);
+            String results = "Processed: " + cloudEvent.getData();
+            log.info(results);
+            return MessageBuilder.withPayload(results).build();
+        };
+    }
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringEventsApplication.class, args);
+    }
+
+}
+----
+
+== Build and test locally
+
+Build and run:
+
+[source,bash]
+----
+./mvnw spring-boot:run
+----
+
+In a separate terminal:
+
+[source,bash]
+----
+curl -w'\n' localhost:8080 \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0001" \
+ -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
+----
+
+== Build and test on k8s
+
+=== Install Knative Serving
+
+First we need to install Knative Serving on a Kubernetes cluster.
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-crds.yaml
+----
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-core.yaml
+----
+
+We also need an ingress. Here we will use Contour.
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/net-contour/releases/download/v0.13.0/contour.yaml
+kubectl apply -f https://github.com/knative/net-contour/releases/download/v0.13.0/net-contour.yaml
+kubectl patch configmap/config-network \
+  --namespace knative-serving \
+  --type merge \
+  --patch '{"data":{"ingress.class":"contour.ingress.networking.knative.dev"}}'
+----
+
+Configure DNS for xip.io
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-default-domain.yaml
+----
+
+Look up ingress IP:
+
+[source,bash]
+----
+INGRESS=$(kubectl --namespace contour-external get service envoy --output 'jsonpath={.status.loadBalancer.ingress[0].ip}')
+----
+
+=== Configure Skaffold
+
+Create a Knative Service manifest:
+
+[source,bash]
+----
+cat <<EOF > knative-service.yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: spring-events
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - image: spring-events
+EOF
+----
+
+Initialize skaffold:
+
+[source,bash]
+----
+skaffold init --skip-build
+----
+
+Modify `skaffold.yaml` and add the `build` section
+
+[source,yaml,subs=+quotes]
+----
+apiVersion: skaffold/v2alpha4
+kind: Config
+metadata:
+  name: spring-events
+build:
+  artifacts:
+    - image: spring-events
+      buildpack:
+        builder: "cloudfoundry/cnb:cflinuxfs3"
+  tagPolicy:
+    sha256: {}
+deploy:
+  kubectl:
+    manifests:
+    - knative-service.yaml
+----
+
+Set your own prefix for the repository name, should be your Docker ID:
+
+[source,bash]
+----
+skaffold config set default-repo $USER
+----
+
+=== Deploy to Kubernetes
+
+Build and deploy to Kubernetes cluster:
+
+[source,bash]
+----
+skaffold run
+----
+
+Send a message:
+
+[source,bash]
+----
+curl -w'\n' http://spring-events.default.${INGRESS}.xip.io \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0001" \
+ -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
+----
+
+Check the logs:
+
+[source,bash]
+----
+kubectl logs -c user-container -l serving.knative.dev/configuration=spring-events
+----
+
+== Use Knative eventing to dispatch the CloudEvents
+
+
+=== Install Knative Eventing
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/eventing-crds.yaml
+----
+
+[source,bash]
+----
+kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/eventing-core.yaml
+kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/in-memory-channel.yaml
+kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/channel-broker.yaml
+----
+
+=== Create a trigger 
+
+We need a trigger to respond to the `SpringEvents` CloudEvents. This trigger will also start a default broker in the default namespace.
+
+[source,bash]
+----
+kubectl -n default apply -f - << EOF
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: spring-events
+  annotations:
+    knative-eventing-injection: enabled
+spec:
+  filter:
+    attributes:
+      type: com.example.springevent
+  subscriber:
+    ref:
+     apiVersion: v1
+     kind: Service
+     name: spring-events
+EOF
+----
+
+Now we can try posting events to the broker:
+
+First create a shell inside the cluster where you can execute curl commands:
+
+[source,bash]
+----
+kubectl run curl --image=radial/busyboxplus:curl -i --tty --rm
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0001" \
+ -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0002" \
+ -d '{"releaseDate":"2006-10-03", "releaseName":"Spring Framework", "version":"2.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0003" \
+ -d '{"releaseDate":"2007-11-19", "releaseName":"Spring Framework", "version":"2.5"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0004" \
+ -d '{"releaseDate":"2009-12-16", "releaseName":"Spring Framework", "version":"3.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0005" \
+ -d '{"releaseDate":"2013-12-12", "releaseName":"Spring Framework", "version":"4.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0006" -d \
+ '{"releaseDate":"2014-04-01", "releaseName":"Spring Boot", "version":"1.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0007" \
+ -d '{"releaseDate":"2017-09-28", "releaseName":"Spring Framework", "version":"5.0"}'
+----
+
+[source,bash]
+----
+curl -v "http://default-broker.default.svc.cluster.local" \
+ -H "Ce-Specversion: 1.0" \
+ -H "Ce-Type: com.example.springevent" \
+ -H "Ce-Source: spring.io/spring-event" \
+ -H "Content-Type: application/json" \
+ -H "Ce-Id: 0008" \
+ -d '{"releaseDate":"2018-03-01", "releaseName":"Spring Boot", "version":"2.0"}'
+----
+
+Check the logs in a separate terminal window:
+
+[source,bash]
+----
+kubectl logs -c user-container -l serving.knative.dev/configuration=spring-events
+----
+
+Clean up:
+
+[source,bash]
+----
+kubectl delete trigger.eventing.knative.dev/spring-events
+kubectl delete service.serving.knative.dev/spring-events
+----
