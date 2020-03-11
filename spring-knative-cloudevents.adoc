@@ -68,7 +68,7 @@ Also add the jsonschema2pojo plugin to the `build` section in `pom.xml`:
             </plugin>
 ----
 
-Next add the scema for the `SpringEvent` class.
+Next add the schema for the `SpringEvent` class.
 
 > We expect this type being part of a type registry in Knative Eventing. In this case we haven't registered a source that will provide this type. Instead we'll add this manually to our project. 
 
