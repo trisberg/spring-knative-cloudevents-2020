@@ -7,9 +7,9 @@ This document describes how to get started writing SpringBoot apps that can proc
 
 Prerequisits:
 
-- kubectl CLI and a Kubernetes cluster
-- curl command
-- Java 11 JDK
+- a https://kubernetes.io/[Kubernetes] cluster and the https://kubernetes.io/docs/tasks/tools/install-kubectl/[kubectl CLI]
+- https://curl.haxx.se/[curl] command
+- https://adoptopenjdk.net/installation.html?variant=openjdk11#[Java 11 JDK]
 - https://skaffold.dev/[Skaffold]
 - https://www.docker.com/[Docker] and https://buildpacks.io/docs/install-pack/[pack CLI]
 
@@ -223,13 +223,6 @@ Configure DNS for xip.io
 kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-default-domain.yaml
 ----
 
-Look up ingress IP:
-
-[source,bash]
-----
-INGRESS=$(kubectl --namespace contour-external get service envoy --output 'jsonpath={.status.loadBalancer.ingress[0].ip}')
-----
-
 === Configure Skaffold
 
 Create a Knative Service manifest:
@@ -294,11 +287,18 @@ Build and deploy to Kubernetes cluster:
 skaffold run
 ----
 
+Look up service URL:
+
+[source,bash]
+----
+SERVICE_URL=$(kubectl get service.serving.knative.dev/spring-events -o jsonpath='{.status.url}')
+----
+
 Send a message:
 
 [source,bash]
 ----
-curl -w'\n' http://spring-events.default.${INGRESS}.xip.io \
+curl -w'\n' ${SERVICE_URL} \
  -H "Ce-Specversion: 1.0" \
  -H "Ce-Type: com.example.springevent" \
  -H "Ce-Source: spring.io/spring-event" \
@@ -315,7 +315,6 @@ kubectl logs -c user-container -l serving.knative.dev/configuration=spring-event
 ----
 
 == Use Knative eventing to dispatch the CloudEvents
-
 
 === Install Knative Eventing
 
