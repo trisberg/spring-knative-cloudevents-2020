@@ -356,6 +356,8 @@ spec:
 EOF
 ----
 
+=== Post some test data
+
 Now we can try posting events to the broker:
 
 First create a shell inside the cluster where you can execute curl commands:
