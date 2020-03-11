@@ -460,10 +460,44 @@ Check the logs in a separate terminal window:
 kubectl logs -c user-container -l serving.knative.dev/configuration=spring-events
 ----
 
-Clean up:
+=== Clean up:
+
+Delete the service and trigger:
 
 [source,bash]
 ----
 kubectl delete trigger.eventing.knative.dev/spring-events
 kubectl delete service.serving.knative.dev/spring-events
+----
+
+Delete the default broker:
+
+[source,bash]
+----
+kubectl label namespace default knative-eventing-injection-
+kubectl delete broker.eventing.knative.dev/default
+----
+
+Delete any left over Knative resources:
+[source,bash]
+----
+kubectl delete knative --all --all-namespaces
+----
+
+Uninstall Knative Eventing:
+
+[source,bash]
+----
+kubectl delete -f https://github.com/knative/eventing/releases/download/v0.13.0/channel-broker.yaml
+kubectl delete -f https://github.com/knative/eventing/releases/download/v0.13.0/in-memory-channel.yaml
+kubectl delete -f https://github.com/knative/eventing/releases/download/v0.13.0/eventing-core.yaml
+----
+
+Uninstall Knative Serving:
+
+[source,bash]
+----
+kubectl delete -f https://github.com/knative/net-contour/releases/download/v0.13.0/contour.yaml
+kubectl delete -f https://github.com/knative/net-contour/releases/download/v0.13.0/net-contour.yaml
+kubectl delete -f https://github.com/knative/serving/releases/download/v0.13.0/serving-core.yaml
 ----
