@@ -216,13 +216,6 @@ kubectl patch configmap/config-network \
   --patch '{"data":{"ingress.class":"contour.ingress.networking.knative.dev"}}'
 ----
 
-Configure DNS for xip.io
-
-[source,bash]
-----
-kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-default-domain.yaml
-----
-
 === Configure Skaffold
 
 Create a Knative Service manifest:
@@ -259,6 +252,8 @@ kind: Config
 metadata:
   name: spring-events
 build:
+  local:
+    push: true
   artifacts:
     - image: spring-events
       buildpack:
@@ -287,18 +282,28 @@ Build and deploy to Kubernetes cluster:
 skaffold run
 ----
 
-Look up service URL:
+Look up Ingress external IP or hostname.
+
+For most clusters like GKE, microk8s etc use:
 
 [source,bash]
 ----
-SERVICE_URL=$(kubectl get service.serving.knative.dev/spring-events -o jsonpath='{.status.url}')
+INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+----
+
+For Docker Desktop use:
+
+[source,bash]
+----
+INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ----
 
 Send a message:
 
 [source,bash]
 ----
-curl -w'\n' ${SERVICE_URL} \
+curl -w'\n' ${INGRESS} \
+ -H "Host: spring-events.default.example.com" \
  -H "Ce-Specversion: 1.0" \
  -H "Ce-Type: com.example.springevent" \
  -H "Ce-Source: spring.io/spring-event" \
