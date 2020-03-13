@@ -517,7 +517,7 @@ spec:
 ----
 ===============================
 
-Now, apply this trigger manofest:
+Now, apply this trigger manifest:
 
 [source,bash]
 ----
@@ -574,6 +574,8 @@ Check the logs in a separate terminal window:
 ----
 kubectl logs -c user-container -l serving.knative.dev/configuration=spring-events
 ----
+
+CLose the curl shell inside the cluster by entering `exit` command. 
 
 === Clean up:
 
