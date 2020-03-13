@@ -14,7 +14,7 @@ Prerequisites:
 - https://www.docker.com/[Docker]
 - https://buildpacks.io/docs/install-pack/[pack CLI] from the Cloud Native Buildpacks project.
 
-TIP: ^*^ The Kubernetes cluster must support the `LoadBalancer` service type. This is needed for the ingress service. We have tested these instructions with https://cloud.google.com/kubernetes-engine[Google GKE], https://hub.docker.com/editions/community/docker-ce-desktop-mac[Docker Desktop for Mac], https://hub.docker.com/editions/community/docker-ce-desktop-windows[Docker Desktop for Windows], https://microk8s.io/[MicroK8s] with https://microk8s.io/docs/addons[MetalLB Loadbalancer] on Ubuntu and https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube] with https://minikube.sigs.k8s.io/docs/tasks/loadbalancer/[minikube tunnel]. Try starting with a clean cluster to avoid any conflicts. Make sure to create a cluster with 4 or more cpus.
+TIP: ^*^ The Kubernetes cluster must be version v1.15 or later and must support the `LoadBalancer` service type to run the ingress service. We have tested these instructions with https://cloud.google.com/kubernetes-engine[Google GKE], https://hub.docker.com/editions/community/docker-ce-desktop-mac[Docker Desktop for Mac], https://hub.docker.com/editions/community/docker-ce-desktop-windows[Docker Desktop for Windows], https://microk8s.io/[MicroK8s] with https://microk8s.io/docs/addons[MetalLB Loadbalancer] on Ubuntu and https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube] with https://minikube.sigs.k8s.io/docs/tasks/loadbalancer/[minikube tunnel]. Try starting with a clean cluster to avoid any conflicts. Make sure to create a cluster with 4 or more cpus.
 
 == Initialize a project
 
