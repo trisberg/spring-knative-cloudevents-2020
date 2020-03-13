@@ -7,11 +7,13 @@ This document describes how to get started writing SpringBoot apps that can proc
 
 Prerequisits:
 
-- a https://kubernetes.io/[Kubernetes] cluster and the https://kubernetes.io/docs/tasks/tools/install-kubectl/[kubectl CLI]
+- a https://kubernetes.io/[Kubernetes] cluster^*^ and the https://kubernetes.io/docs/tasks/tools/install-kubectl/[kubectl CLI]
 - https://curl.haxx.se/[curl] command
 - https://adoptopenjdk.net/installation.html?variant=openjdk11#[Java 11 JDK]
 - https://skaffold.dev/[Skaffold]
 - https://www.docker.com/[Docker] and https://buildpacks.io/docs/install-pack/[pack CLI]
+
+TIP: ^*^ The Kubernetes cluster must support the `LoadBalancer` service type. This is needed for the ingress service. We have tested these instructions with Google GKE, Docker Desktop for Mac, Docker Desktop for Windows and MicroK8s with MetalLB Loadbalancer on Ubuntu. Try starting with a clean cluster to avoid any conflicts. 
 
 == Initialize a project
 
@@ -19,19 +21,39 @@ Initialize a Spring Boot function application from https://start.spring.io[start
 
 [source,bash]
 ----
-APPNAME=spring-events
 curl https://start.spring.io/starter.tgz \
  -d dependencies=webflux,actuator,cloud-function \
  -d language=java \
  -d javaVersion=11 \
  -d type=maven-project \
  -d groupId=com.example \
- -d artifactId=${APPNAME} \
- -d name=${APPNAME} \
- -d packageName=com.example.${APPNAME} \
- -d baseDir=${APPNAME} | tar -xzvf -
-cd ${APPNAME}
+ -d artifactId=spring-events \
+ -d name=spring-events \
+ -d packageName=com.example.spring-events \
+ -d baseDir=spring-events | tar -xzvf -
+cd spring-events
 ----
+
+.on Windows use:
+[NOTE]
+===============================
+----
+curl.exe https://start.spring.io/starter.tgz `
+ -d dependencies=webflux,actuator,cloud-function `
+ -d language=java `
+ -d javaVersion=11 `
+ -d type=maven-project `
+ -d groupId=com.example `
+ -d artifactId=spring-events `
+ -d name=spring-events `
+ -d packageName=com.example.spring-events `
+ -d baseDir=spring-events `
+ -o spring-events.tgz
+tar.exe -xzvf spring-events.tgz
+rm spring-events.tgz
+cd spring-events
+----
+===============================
 
 == Add the function code
 
@@ -80,6 +102,15 @@ mkdir -p src/main/resources/schema
 touch src/main/resources/schema/spring-event.json
 ----
 
+.on Windows use:
+[NOTE]
+===============================
+----
+mkdir -p src/main/resources/schema
+New-Item -type file src/main/resources/schema/spring-event.json
+----
+===============================
+
 Then, add this content:
 
 .src/main/resources/schema/spring-event.json
@@ -120,6 +151,16 @@ mkdir -p src/main/java/com/springdeveloper/support/cloudevents
 curl https://raw.githubusercontent.com/trisberg/cloud-event-mapper/master/src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java \
   -o src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java
 ----
+
+.on Windows use:
+[NOTE]
+===============================
+----
+mkdir -p src/main/java/com/springdeveloper/support/cloudevents
+curl.exe https://raw.githubusercontent.com/trisberg/cloud-event-mapper/master/src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java `
+  -o src/main/java/com/springdeveloper/support/cloudevents/CloudEventMapper.java
+----
+===============================
 
 Finally, we need to add the function code to handle the CloudEvent in the SpringEventsApplication class:
 
@@ -188,6 +229,20 @@ curl -w'\n' localhost:8080 \
  -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
 ----
 
+.on Windows use:
+[NOTE]
+===============================
+----
+curl.exe -w'\n' localhost:8080 `
+ -H "Ce-Specversion: 1.0" `
+ -H "Ce-Type: com.example.springevent" `
+ -H "Ce-Source: spring.io/spring-event" `
+ -H "Content-Type: application/json" `
+ -H "Ce-Id: 0001" `
+ -d '{\"releaseDate\":\"2004-03-24\", \"releaseName\":\"Spring Framework\", \"version\":\"1.0\"}'
+----
+===============================
+
 == Build and test on k8s
 
 === Install Knative Serving
@@ -204,19 +259,38 @@ kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/se
 kubectl apply -f https://github.com/knative/serving/releases/download/v0.13.0/serving-core.yaml
 ----
 
-We also need an ingress. Here we will use Contour.
+We also need an ingress service. Here we will use Contour.
 
 [source,bash]
 ----
 kubectl apply -f https://github.com/knative/net-contour/releases/download/v0.13.0/contour.yaml
 kubectl apply -f https://github.com/knative/net-contour/releases/download/v0.13.0/net-contour.yaml
+----
+
+Now we need to configure Knative Serving to use this ingress service.
+
+[source,bash]
+----
 kubectl patch configmap/config-network \
   --namespace knative-serving \
   --type merge \
   --patch '{"data":{"ingress.class":"contour.ingress.networking.knative.dev"}}'
 ----
 
+.on Windows use:
+[NOTE]
+===============================
+----
+kubectl patch configmap/config-network `
+  --namespace knative-serving `
+  --type merge `
+  --patch '{\"data\":{\"ingress.class\":\"contour.ingress.networking.knative.dev\"}}'
+----
+===============================
+
 === Configure Skaffold
+
+TIP: Skaffold sends color codes to the terminal output which might make it hard to read for Windows Powershell. You can add a `--color=0` option to any Skaffold command to minimize the color codes and make the output more readable.
 
 Create a Knative Service manifest:
 
@@ -235,6 +309,25 @@ spec:
         - image: spring-events
 EOF
 ----
+
+.on Windows use:
+[NOTE]
+===============================
+----
+@"
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: spring-events
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - image: spring-events
+"@ | Out-File knative-service.yaml -enc ascii
+----
+===============================
 
 Initialize skaffold:
 
@@ -266,12 +359,20 @@ deploy:
     - knative-service.yaml
 ----
 
-Set your own prefix for the repository name, should be your Docker ID:
+Set your own prefix for the repository name, here we use the current user logged in. This should match your Docker ID, if it doesn't just replace it with your Docker ID instead.
 
 [source,bash]
 ----
 skaffold config set default-repo $USER
 ----
+
+.on Windows use:
+[NOTE]
+===============================
+----
+skaffold config set default-repo $env:UserName
+----
+===============================
 
 === Deploy to Kubernetes
 
@@ -291,18 +392,35 @@ For most clusters like GKE, microk8s etc use:
 INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ----
 
-For Docker Desktop use:
+.on Windows use:
+[NOTE]
+===============================
+----
+$INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+----
+===============================
 
-[source,bash]
+.on Mac with Docker Desktop use:
+[NOTE]
+===============================
 ----
 INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ----
+===============================
+
+.on Windows with Docker Desktop use:
+[NOTE]
+===============================
+----
+$INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+----
+===============================
 
 Send a message:
 
 [source,bash]
 ----
-curl -w'\n' ${INGRESS} \
+curl -w'\n' $INGRESS \
  -H "Host: spring-events.default.example.com" \
  -H "Ce-Specversion: 1.0" \
  -H "Ce-Type: com.example.springevent" \
@@ -311,6 +429,21 @@ curl -w'\n' ${INGRESS} \
  -H "Ce-Id: 0001" \
  -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
 ----
+
+.on Windows use:
+[NOTE]
+===============================
+----
+curl.exe -w'\n' $INGRESS `
+ -H "Host: spring-events.default.example.com" `
+ -H "Ce-Specversion: 1.0" `
+ -H "Ce-Type: com.example.springevent" `
+ -H "Ce-Source: spring.io/spring-event" `
+ -H "Content-Type: application/json" `
+ -H "Ce-Id: 0001" `
+ -d '{\"releaseDate\":\"2004-03-24\", \"releaseName\":\"Spring Framework\", \"version\":\"1.0\"}'
+----
+===============================
 
 Check the logs:
 
@@ -341,7 +474,7 @@ We need a trigger to respond to the `SpringEvents` CloudEvents. This trigger wil
 
 [source,bash]
 ----
-kubectl -n default apply -f - << EOF
+cat <<EOF > knative-trigger.yaml
 apiVersion: eventing.knative.dev/v1alpha1
 kind: Trigger
 metadata:
@@ -360,6 +493,37 @@ spec:
 EOF
 ----
 
+.on Windows use:
+[NOTE]
+===============================
+----
+@"
+apiVersion: eventing.knative.dev/v1alpha1
+kind: Trigger
+metadata:
+  name: spring-events
+  annotations:
+    knative-eventing-injection: enabled
+spec:
+  filter:
+    attributes:
+      type: com.example.springevent
+  subscriber:
+    ref:
+     apiVersion: v1
+     kind: Service
+     name: spring-events
+"@ | Out-File knative-trigger.yaml -enc ascii
+----
+===============================
+
+Now, apply this trigger manofest:
+
+[source,bash]
+----
+kubectl -n default apply -f knative-trigger.yaml
+----
+
 === Post some test data
 
 Now we can try posting events to the broker:
@@ -368,7 +532,7 @@ First create a shell inside the cluster where you can execute curl commands:
 
 [source,bash]
 ----
-kubectl run curl --image=radial/busyboxplus:curl -i --tty --rm
+kubectl run curl --generator=run-pod/v1 --image=radial/busyboxplus:curl -i --tty --rm
 ----
 
 [source,bash]
@@ -380,61 +544,6 @@ curl -v "http://default-broker.default.svc.cluster.local" \
  -H "Content-Type: application/json" \
  -H "Ce-Id: 0001" \
  -d '{"releaseDate":"2004-03-24", "releaseName":"Spring Framework", "version":"1.0"}'
-----
-
-[source,bash]
-----
-curl -v "http://default-broker.default.svc.cluster.local" \
- -H "Ce-Specversion: 1.0" \
- -H "Ce-Type: com.example.springevent" \
- -H "Ce-Source: spring.io/spring-event" \
- -H "Content-Type: application/json" \
- -H "Ce-Id: 0002" \
- -d '{"releaseDate":"2006-10-03", "releaseName":"Spring Framework", "version":"2.0"}'
-----
-
-[source,bash]
-----
-curl -v "http://default-broker.default.svc.cluster.local" \
- -H "Ce-Specversion: 1.0" \
- -H "Ce-Type: com.example.springevent" \
- -H "Ce-Source: spring.io/spring-event" \
- -H "Content-Type: application/json" \
- -H "Ce-Id: 0003" \
- -d '{"releaseDate":"2007-11-19", "releaseName":"Spring Framework", "version":"2.5"}'
-----
-
-[source,bash]
-----
-curl -v "http://default-broker.default.svc.cluster.local" \
- -H "Ce-Specversion: 1.0" \
- -H "Ce-Type: com.example.springevent" \
- -H "Ce-Source: spring.io/spring-event" \
- -H "Content-Type: application/json" \
- -H "Ce-Id: 0004" \
- -d '{"releaseDate":"2009-12-16", "releaseName":"Spring Framework", "version":"3.0"}'
-----
-
-[source,bash]
-----
-curl -v "http://default-broker.default.svc.cluster.local" \
- -H "Ce-Specversion: 1.0" \
- -H "Ce-Type: com.example.springevent" \
- -H "Ce-Source: spring.io/spring-event" \
- -H "Content-Type: application/json" \
- -H "Ce-Id: 0005" \
- -d '{"releaseDate":"2013-12-12", "releaseName":"Spring Framework", "version":"4.0"}'
-----
-
-[source,bash]
-----
-curl -v "http://default-broker.default.svc.cluster.local" \
- -H "Ce-Specversion: 1.0" \
- -H "Ce-Type: com.example.springevent" \
- -H "Ce-Source: spring.io/spring-event" \
- -H "Content-Type: application/json" \
- -H "Ce-Id: 0006" -d \
- '{"releaseDate":"2014-04-01", "releaseName":"Spring Boot", "version":"1.0"}'
 ----
 
 [source,bash]
@@ -468,12 +577,12 @@ kubectl logs -c user-container -l serving.knative.dev/configuration=spring-event
 
 === Clean up:
 
-Delete the service and trigger:
+Delete the trigger and the service:
 
 [source,bash]
 ----
 kubectl delete trigger.eventing.knative.dev/spring-events
-kubectl delete service.serving.knative.dev/spring-events
+skaffold delete
 ----
 
 Delete the default broker:
