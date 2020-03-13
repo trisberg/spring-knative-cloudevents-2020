@@ -5,13 +5,14 @@
 
 This document describes how to get started writing SpringBoot apps that can process CloudEvents when deployed to Knative.
 
-Prerequisits:
+Prerequisites:
 
 - a https://kubernetes.io/[Kubernetes] cluster^*^ and the https://kubernetes.io/docs/tasks/tools/install-kubectl/[kubectl CLI]
 - https://curl.haxx.se/[curl] command
 - https://adoptopenjdk.net/installation.html?variant=openjdk11#[Java 11 JDK]
 - https://skaffold.dev/[Skaffold]
-- https://www.docker.com/[Docker] and https://buildpacks.io/docs/install-pack/[pack CLI]
+- https://www.docker.com/[Docker]
+- https://buildpacks.io/docs/install-pack/[pack CLI] from the Cloud Native Buildpacks project.
 
 TIP: ^*^ The Kubernetes cluster must support the `LoadBalancer` service type. This is needed for the ingress service. We have tested these instructions with Google GKE, Docker Desktop for Mac, Docker Desktop for Windows and MicroK8s with MetalLB Loadbalancer on Ubuntu. Try starting with a clean cluster to avoid any conflicts. 
 
@@ -575,7 +576,7 @@ Check the logs in a separate terminal window:
 kubectl logs -c user-container -l serving.knative.dev/configuration=spring-events
 ----
 
-CLose the curl shell inside the cluster by entering `exit` command. 
+Close the curl shell inside the cluster by entering `exit` command. 
 
 === Clean up:
 
