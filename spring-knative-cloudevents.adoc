@@ -390,14 +390,16 @@ For most clusters like GKE, microk8s etc use:
 
 [source,bash]
 ----
-INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+INGRESS=$(kubectl get --namespace contour-external service/envoy \
+ -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ----
 
 .on Windows use:
 [NOTE]
 ===============================
 ----
-$INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+$INGRESS=$(kubectl get --namespace contour-external service/envoy `
+ -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 ----
 ===============================
 
@@ -405,7 +407,8 @@ $INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{
 [NOTE]
 ===============================
 ----
-INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+INGRESS=$(kubectl get --namespace contour-external service/envoy \
+ -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ----
 ===============================
 
@@ -413,7 +416,8 @@ INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.
 [NOTE]
 ===============================
 ----
-$INGRESS=$(kubectl get --namespace contour-external service/envoy -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+$INGRESS=$(kubectl get --namespace contour-external service/envoy `
+ -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ----
 ===============================
 
