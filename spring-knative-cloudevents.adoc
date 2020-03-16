@@ -351,7 +351,7 @@ build:
   artifacts:
     - image: spring-events
       buildpack:
-        builder: "cloudfoundry/cnb:cflinuxfs3"
+        builder: "cloudfoundry/cnb:bionic"
   tagPolicy:
     sha256: {}
 deploy:
@@ -473,19 +473,34 @@ kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/i
 kubectl apply -f https://github.com/knative/eventing/releases/download/v0.13.0/channel-broker.yaml
 ----
 
+
+=== Enable the default broker on the default namespace 
+
+Add a label to the namespace to have the eventing default broker start up:
+
+[source,bash]
+----
+kubectl label namespace default knative-eventing-injection=enabled
+----
+
+Verify that the broker is running:
+
+[source,bash]
+----
+kubectl -n default get broker.eventing.knative.dev default
+----
+
 === Create a trigger 
 
-We need a trigger to respond to the `SpringEvents` CloudEvents. This trigger will also start a default broker in the default namespace.
+We need a trigger to respond to the `SpringEvents` CloudEvents:
 
 [source,bash]
 ----
 cat <<EOF > knative-trigger.yaml
-apiVersion: eventing.knative.dev/v1alpha1
+apiVersion: eventing.knative.dev/v1beta1
 kind: Trigger
 metadata:
   name: spring-events
-  annotations:
-    knative-eventing-injection: enabled
 spec:
   filter:
     attributes:
@@ -503,12 +518,10 @@ EOF
 ===============================
 ----
 @"
-apiVersion: eventing.knative.dev/v1alpha1
+apiVersion: eventing.knative.dev/v1beta1
 kind: Trigger
 metadata:
   name: spring-events
-  annotations:
-    knative-eventing-injection: enabled
 spec:
   filter:
     attributes:
