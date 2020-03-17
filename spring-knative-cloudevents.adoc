@@ -16,6 +16,8 @@ Prerequisites:
 
 TIP: ^*^ The Kubernetes cluster must be version v1.15 or later and must support the `LoadBalancer` service type to run the ingress service. We have tested these instructions with https://cloud.google.com/kubernetes-engine[Google GKE], https://hub.docker.com/editions/community/docker-ce-desktop-mac[Docker Desktop for Mac], https://hub.docker.com/editions/community/docker-ce-desktop-windows[Docker Desktop for Windows], https://microk8s.io/[MicroK8s] with https://microk8s.io/docs/addons[MetalLB Loadbalancer] on Ubuntu and https://kubernetes.io/docs/tasks/tools/install-minikube/[Minikube] with https://minikube.sigs.k8s.io/docs/tasks/loadbalancer/[minikube tunnel]. Try starting with a clean cluster to avoid any conflicts. Make sure to create a cluster with 4 or more cpus.
 
+NOTE: The commands in this guide are targeted for use in a Bash shell on Linux or macOS and PowerShell on Windows 10.
+
 == Initialize a project
 
 Initialize a Spring Boot function application from https://start.spring.io[start.spring.io]:
