@@ -26,6 +26,7 @@ curl https://start.spring.io/starter.tgz \
  -d dependencies=webflux,actuator,cloud-function \
  -d language=java \
  -d javaVersion=11 \
+ -d bootVersion=2.2.5.RELEASE \
  -d type=maven-project \
  -d groupId=com.example \
  -d artifactId=spring-events \
@@ -43,6 +44,7 @@ curl.exe https://start.spring.io/starter.tgz `
  -d dependencies=webflux,actuator,cloud-function `
  -d language=java `
  -d javaVersion=11 `
+ -d bootVersion=2.2.5.RELEASE `
  -d type=maven-project `
  -d groupId=com.example `
  -d artifactId=spring-events `
