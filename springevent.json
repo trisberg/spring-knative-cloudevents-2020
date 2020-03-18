@@ -1,0 +1,19 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SpringEvent",
+    "description" : "This is the schema for the SpringEvent type.",
+    "type": "object",
+    "properties": {
+        "releaseDate": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "releaseName": {
+            "type": "string"
+        },
+        "version": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": false
+}
