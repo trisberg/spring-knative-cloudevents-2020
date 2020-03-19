@@ -1,0 +1,11 @@
+apiVersion: eventing.knative.dev/v1beta1
+kind: EventType
+metadata:
+  name: com.example.springevent
+  namespace: default
+spec:
+  type: com.example.springevent
+  source: https://spring.io/spring-event
+  schema: https://raw.githubusercontent.com/trisberg/spring-knative-cloudevents-2020/master/springevent.json
+  description: SpringEvent type
+  broker: default
