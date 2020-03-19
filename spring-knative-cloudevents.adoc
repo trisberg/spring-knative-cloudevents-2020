@@ -511,7 +511,7 @@ spec:
       type: com.example.springevent
   subscriber:
     ref:
-     apiVersion: v1
+     apiVersion: serving.knative.dev/v1
      kind: Service
      name: spring-events
 EOF
@@ -532,7 +532,7 @@ spec:
       type: com.example.springevent
   subscriber:
     ref:
-     apiVersion: v1
+     apiVersion: serving.knative.dev/v1
      kind: Service
      name: spring-events
 "@ | Out-File knative-trigger.yaml -enc ascii
